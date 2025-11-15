@@ -18,10 +18,10 @@
 #define ECHO4 8
 #define LED4  10
 
-float LOW_LEVEL  = 5.0;
-float MID_LEVEL  = 4.0;
-float HIGH_LEVEL = 3.5;
-float FULL_LEVEL = 3.0;
+float LOW_LEVEL  = 8.0;
+float MID_LEVEL  = 7.0;
+float HIGH_LEVEL = 6.0;
+float FULL_LEVEL = 5.0;
 
 float readDistance(int trigPin, int echoPin){
 
@@ -37,18 +37,20 @@ float readDistance(int trigPin, int echoPin){
   if (duration == 0) return -1;   // invalid reading
 
   float distance = duration / 58.0;
+  
   return distance;
 }
+
 
 void setLEDLevel(int ledPin, float distance) {
 
   if (distance < 0) {
-    analogWrite(ledPin, 0);   // sensor error
+    analogWrite(ledPin, 0);
     return;
   }
 
-  // FULL level (< 2 cm)
-  if (distance < FULL_LEVEL) {
+  // FULL (5 cm or less)
+  if (distance <= FULL_LEVEL) {
     analogWrite(ledPin, 255);
     delay(150);
     analogWrite(ledPin, 0);
@@ -56,25 +58,24 @@ void setLEDLevel(int ledPin, float distance) {
     return;
   }
 
-  // HIGH (>= 2 cm)
-  if (distance >= HIGH_LEVEL && distance < MID_LEVEL) {
+  // HIGH (6 cm - 5 cm)
+  if (distance <= HIGH_LEVEL) {
     analogWrite(ledPin, 150);
     return;
   }
 
-  // MIDDLE (>= 3 cm)
-  if (distance >= MID_LEVEL && distance < LOW_LEVEL) {
+  // MIDDLE (7 cm - 6 cm)
+  if (distance <= MID_LEVEL) {
     analogWrite(ledPin, 50);
     return;
   }
 
-  // LOW (>= 5 cm)
+  // LOW (>= 8 cm)
   if (distance >= LOW_LEVEL) {
     analogWrite(ledPin, 0);
     return;
   }
 }
-
 
 void setup(){
 
@@ -90,8 +91,11 @@ void setup(){
 void loop(){
 
   float d1 = readDistance(TRIG1, ECHO1);
+  delay(100);
   float d2 = readDistance(TRIG2, ECHO2);
+  delay(100);
   float d3 = readDistance(TRIG3, ECHO3);
+  delay(100);
   float d4 = readDistance(TRIG4, ECHO4);
 
   setLEDLevel(LED1, d1);
