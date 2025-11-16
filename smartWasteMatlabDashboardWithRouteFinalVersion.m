@@ -9,21 +9,21 @@ pollPeriod = 1.0; % seconds between UI updates
 saveData = false;         
 maxHistory = 200;         
 collectThreshold = "HIGH"; %default   
- 
+
+% city coordinates (range)
+cityX = [0 32];   
+cityY = [0 49.5];   
+
 % depot coordinates
-depot = [0.5, 4];
+depot = [0.5, 25];
 
 % bin coordinates
 binCoords = [ 
-    2 4;  % bin 1
-    1 2;  % bin 2
-    2 1;  % bin 3
-    1 1   % Bin 4
+    24 38;  % bin 1
+    8 44;   % bin 2
+    25 20;  % bin 3
+    13 12   % Bin 4
 ];
-
-% city coordinates (range)
-cityX = [0 5];   
-cityY = [0 7.5];   
 
 LOW_LEVEL = 5;
 MID_LEVEL = 4;
