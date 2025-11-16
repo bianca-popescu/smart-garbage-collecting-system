@@ -44,14 +44,40 @@ float readDistanceRaw(int trigPin, int echoPin){
 // smoothing function - median filtering
 // uses about 5 readings in order to obtain a better serial output
 
+float approximateCloseDistance(float lastValid) {
+  // Smooth exponential approach as distance shrinks
+  float approx = 2.0 + 0.3 * exp(-0.7 * (lastValid - 2.0));
+
+  // Clamp to sensor minimum (HC-SR04 cannot detect < 1.7 cm)
+  if (approx < 1.7) approx = 1.7;
+  
+  return approx;
+}
+
 float readDistanceSmooth(int trigPin, int echoPin){
 
-  const int N = 5; // number of reading used
+  const int N = 4; // number of reading used
   float vals[N];
 
   for(int i = 0; i < N; i++){
     vals[i] = readDistanceRaw(trigPin, echoPin);
-    delay(50); // small delay between readings
+
+    // condition to reject extreme outlines
+    if(vals[i] <= 0 || vals[i] > 6) vals[i] = -1;
+    
+    delay(40); // small delay between readings
+  }
+
+
+  float lastValid = 2.5; // start with a neutral mid value
+
+  for (int i = 0; i < N; i++) {
+    if (vals[i] > 0) {
+      lastValid = vals[i];
+    } else {
+      // Instead of forcing to "2", approximate realistically
+      vals[i] = approximateCloseDistance(lastValid);
+    }
   }
 
   // sort array - bubble sort
@@ -67,9 +93,6 @@ float readDistanceSmooth(int trigPin, int echoPin){
 
   // median value = middle value 
   float median = vals[N/2];
-
-  // condition to reject extreme outlines
-  if(median <= 0 || median > 200) return -1;
 
   return median;
 }
