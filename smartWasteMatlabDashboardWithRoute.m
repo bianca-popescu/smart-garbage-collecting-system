@@ -11,7 +11,7 @@ maxHistory = 200;
 collectThreshold = 70;    
 
 % depot coordinates
-depot = [0.5, -0.3];
+depot = [0.5, 4];
 
 % bin coordinates
 binCoords = [ 
@@ -20,6 +20,10 @@ binCoords = [
     2 1;  % bin 3
     1 1   % Bin 4
 ];
+
+% city coordinates (range)
+cityX = [0 10];   
+cityY = [0 15];   
 
 % state
 state = struct();
@@ -33,40 +37,47 @@ state.maxHistory = maxHistory;
 state.running = false;
 state.startTime = datetime('now');
 state.history = cell(1,numBins);
+
 for i=1:numBins, state.history{i} = []; end
 
 sp = []; % serial handle
 
-%% -------------------- CREATE UI --------------------
-fig = uifigure('Name','Smart Waste Dashboard (TSP)','AutoResizeChildren','on');
+% UI
+fig = uifigure('Name','Smart Garbage Collecting System Dashboard','AutoResizeChildren','on');
 fig.WindowState = 'maximized';  % full screen
 fig.CloseRequestFcn = @onClose;
 
-% Main grid: left visualization, right controls
+% main grid: left visualization, right controls
 mainGrid = uigridlayout(fig,[1 2]);
-mainGrid.ColumnWidth = {'2.5x','1x'};
+mainGrid.ColumnWidth = {'2x','1x'};
 mainGrid.RowHeight   = {'1x'};
 
-%% -------- LEFT PANEL (Visualization) --------
+% left panel
 leftPanel = uipanel(mainGrid,'Title','Visualization');
 leftGrid = uigridlayout(leftPanel,[2 1]);
 leftGrid.RowHeight = {'2x','1x'};
 
-% Map axes
+% map axes
 mapAx = uiaxes(leftGrid);
-mapAx.Title.String = 'Smart Waste City Map + Shortest Route';
+mapAx.Title.String = 'City Map';
 mapAx.XLabel.String = 'X';
 mapAx.YLabel.String = 'Y';
 hold(mapAx,'on');
 
-% Bar chart
+mapAx.XLim = cityX;
+mapAx.YLim = cityY;
+mapAx.XTick = linspace(cityX(1),cityX(2),5); 
+mapAx.YTick = linspace(cityY(1),cityY(2),5);
+axis(mapAx,'equal'); 
+
+% bar chart
 barAx = uiaxes(leftGrid);
 barAx.YLim = [0 100];
 barPlot = bar(barAx, zeros(1,numBins),'FaceColor','flat');
 barAx.XTick = 1:numBins;
 barAx.Title.String = 'Bin Fill Levels (%)';
 
-% Map markers
+% map markers
 binMarkers = gobjects(1,numBins);
 binLabels = gobjects(1,numBins);
 for k=1:numBins
@@ -77,57 +88,57 @@ end
 depotMarker = plot(mapAx, depot(1), depot(2), 's', 'MarkerSize', 16, 'MarkerFaceColor', [0.2 0.6 1], 'MarkerEdgeColor','k');
 text(mapAx, depot(1)+0.03, depot(2)+0.03, 'Depot','FontWeight','bold');
 
-% Route line
+% route line
 routeLine = plot(mapAx, nan, nan, '-','LineWidth',2,'Color',[0.85 0.33 0.1]);
 
-%% -------- RIGHT PANEL (Controls + Table + History) --------
+% RIGHT PANEL 
 rightPanel = uipanel(mainGrid,'Title','Controls & Table');
 rightGrid = uigridlayout(rightPanel,[5 1]);
 rightGrid.RowHeight = {80, 50, 100, 200, '1x'}; % port+status, buttons, threshold, table, log/history
 
-% --- Port & Status info ---
+% port & status info 
 infoGrid = uigridlayout(rightGrid,[1 3]);
 lblPort = uilabel(infoGrid,'Text',['Port: ' char(port)]);
 lblBaud = uilabel(infoGrid,'Text',['Baud: ' num2str(baud)]);
 lblStatus = uilabel(infoGrid,'Text','Status: Stopped','FontColor',[0.5 0 0]);
 
-% --- Start/Stop buttons ---
+% start/stop buttons
 btnGrid = uigridlayout(rightGrid,[1 2]);
 btnStart = uibutton(btnGrid,'push','Text','Start','ButtonPushedFcn',@(btn,event) startPolling());
 btnStop  = uibutton(btnGrid,'push','Text','Stop','ButtonPushedFcn',@(btn,event) stopPolling());
 btnStop.Enable = 'off';
 
-% --- Threshold slider ---
+% threshold slider
 threshGrid = uigridlayout(rightGrid,[1 3]);
 lblThresh = uilabel(threshGrid,'Text','Collect Threshold (%)');
 sldThresh = uislider(threshGrid,'Limits',[0 100],'Value',collectThreshold,'ValueChangedFcn',@(s,event) setThreshold(s.Value));
 lblThreshVal = uilabel(threshGrid,'Text',sprintf('%d %%',collectThreshold));
 
-% --- Table of current fill / predicted times ---
+% table of current fill / predicted times 
 tbl = uitable(rightGrid);
-tbl.ColumnName = {'Bin','Fill %','TimeToFull (h)'};
+tbl.ColumnName = {'Bin','Fill %','Predicted time to full'};
 tbl.Data = table((1:numBins)', zeros(numBins,1), repmat({'n/a'},numBins,1));
 
-% --- History axes ---
+% history axes 
 histAx = uiaxes(rightGrid);
-histAx.Title.String = 'Last Fill History (per bin)';
+histAx.Title.String = 'Last fill history (per bin)';
 histAx.YLim = [0 100];
-histAx.XLabel.String = 'Samples (old → new)';
+histAx.XLabel.String = 'Samples (old -> new)';
 
-% --- Log area ---
+% Log area 
 logArea = uitextarea(rightGrid,'Editable','off');
 
-%% -------------------- UI STRUCT --------------------
+% UI structure
 ui = struct('fig',fig,'barPlot',barPlot,'mapAx',mapAx,'mapMarkers',binMarkers,'mapLabels',binLabels, ...
             'depot',depotMarker,'routeLine',routeLine,'tbl',tbl,'histAx',histAx,'logArea',logArea, ...
             'lblStatus',lblStatus,'lblThreshVal',lblThreshVal);
 
-writeLog('UI ready. Click Start to begin reading!');
+writeLog('UI ready. Click Start to begin reading! :)');
 
-%% -------------------- TIMER --------------------
+% timer
 t = timer('ExecutionMode','fixedRate','Period',pollPeriod,'TimerFcn',@onTimer,'BusyMode','drop');
 
-%% -------------------- NESTED FUNCTIONS --------------------
+% nested functions
 function setThreshold(val)
     collectThreshold = round(val);
     ui.lblThreshVal.Text = sprintf('%d %%', collectThreshold);
@@ -182,7 +193,7 @@ function onTimer(~,~)
         fill = min(max(100*(1 - distances/state.binHeight),0),100);
         ts = datetime('now');
 
-        % Push to history
+        % push to history
         for k=1:state.numBins
             hist = state.history{k};
             hist = [hist; struct('t',ts,'fill',fill(k))];
@@ -190,7 +201,7 @@ function onTimer(~,~)
             state.history{k} = hist;
         end
 
-        % Predict time to full
+        % predict time to full
         timeToFull = nan(state.numBins,1);
         for k=1:state.numBins
             H = state.history{k};
@@ -220,12 +231,12 @@ function onTimer(~,~)
 end
 
 function updateUI(fill,timeToFull,~)
-    % Bar chart
+    % bar chart
     ui.barPlot.YData = fill;
     for k=1:state.numBins, ui.barPlot.CData(k,:) = fillColor(fill(k)); end
     barAx.Title.String = sprintf('Bin Fill Levels (last update %s)', datestr(datetime('now'),'HH:MM:SS'));
 
-    % History
+    % history
     cla(ui.histAx); hold(ui.histAx,'on');
     for k=1:state.numBins
         H=state.history{k};
@@ -234,7 +245,7 @@ function updateUI(fill,timeToFull,~)
     end
     hold(ui.histAx,'off'); legend(ui.histAx,'Location','northeastoutside');
 
-    % Table
+    % table
     T = table((1:state.numBins)',fill', repmat({''},state.numBins,1),'VariableNames',{'Bin','Fill','TimeToFull'});
     for k=1:state.numBins
         if isfinite(timeToFull(k))
@@ -245,14 +256,14 @@ function updateUI(fill,timeToFull,~)
     end
     ui.tbl.Data=T;
 
-    % Map markers
+    % map markers
     for k=1:state.numBins
         c=fillColor(fill(k));
         set(ui.mapMarkers(k),'MarkerFaceColor',c,'MarkerEdgeColor','k','MarkerSize', max(8,6+round(fill(k)/10)));
         set(ui.mapLabels(k),'String',sprintf('Bin%d (%.0f%%)',k,fill(k)));
     end
 
-    % Compute route
+    % compute route
     toCollectIdx=find(fill>=collectThreshold);
     if isempty(toCollectIdx)
         set(ui.routeLine,'XData',nan,'YData',nan);
@@ -263,7 +274,7 @@ function updateUI(fill,timeToFull,~)
         routePts=[depot; selectedCoords(bestRouteIdx,:); depot];
         set(ui.routeLine,'XData',routePts(:,1),'YData',routePts(:,2));
 
-        % Annotate order
+        % annotate order
         delete(findall(ui.mapAx,'Tag','orderText'));
         for idx=1:length(bestRouteIdx)
             binGlobalIdx = toCollectIdx(bestRouteIdx(idx));
